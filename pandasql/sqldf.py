@@ -4,6 +4,7 @@ import numpy as np
 from pandas.io.sql import to_sql, read_sql
 import re
 import os
+import hashlib
 
 def _ensure_data_frame(obj, name):
     """
@@ -59,6 +60,25 @@ def _write_table(tablename, df, conn):
 
     to_sql(df, name=tablename, con=conn, flavor='sqlite')
 
+def _hasher(val):
+    "hash a column name"
+    return hashlib.sha224(val.encode()).hexdigest()
+    
+def _encode_colnames(df):
+    "encode original column name to hash"
+    hash2name={}
+    name2hash={}
+    for n in df.columns:
+        k=_hasher(n)
+        hash2name[k]=n
+        name2hash[n]=k
+    df.rename(columns=lambda x: name2hash[x], inplace=True)
+    return df,hash2name,name2hash
+
+def _decode_colnames(df,hash2name):
+    "convert hashed column name back to original"
+    df.rename(columns=lambda x: hash2name[x], inplace=True)
+    return df
 
 def sqldf(q, env, inmemory=True):
     """
@@ -108,12 +128,20 @@ def sqldf(q, env, inmemory=True):
             raise Exception("%s not found" % table)
         df = env[table]
         df = _ensure_data_frame(df, table)
-        _write_table(table, df, conn)
+        
+        #As we're changing column names, work on a copy of the table
+        df,hash2name,name2hash = _encode_colnames(df.copy())
 
+        _write_table(table, df, conn)
     try:
+        #Rename column names in the query with hashes
+        for n in name2hash:
+            q=q.replace(n,name2hash[n])
+        print(q)
         result = read_sql(q, conn, index_col=None)
         if 'index' in result:
             del result['index']
+        result = _decode_colnames(result,hash2name)
     except Exception:
         result = None
     finally:
