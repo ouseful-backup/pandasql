@@ -9,7 +9,6 @@ import hashlib
 def _ensure_data_frame(obj, name):
     """
     obj a python object to be converted to a DataFrame
-
     take an object and make sure that it's a pandas data frame
     """
     # we accept pandas Dataframe, and also dictionaries, lists, tuples
@@ -64,7 +63,7 @@ def _hasher(val):
     "hash a column name"
     return hashlib.sha224(val.encode()).hexdigest()
     
-def _encode_colnames(df):
+def _encode_colnames2(df):
     "encode original column name to hash"
     hash2name={}
     name2hash={}
@@ -75,7 +74,26 @@ def _encode_colnames(df):
     df.rename(columns=lambda x: name2hash[x], inplace=True)
     return df,hash2name,name2hash
 
-def _decode_colnames(df,hash2name):
+def _encode_colnames(df):
+    "encode original column name to label"
+    label2name={}
+    name2label={}
+    label="col"
+    lc=0
+    for n in df.columns:
+        lc+=1
+        k=label+str(lc)
+        label2name[k]=n
+        name2label[n]=k
+    df.rename(columns=lambda x: name2label[x], inplace=True)
+    return df,label2name,name2label
+
+def _decode_colnames(df,label2name):
+    "convert label column name back to original"
+    df.rename(columns=lambda x: label2name[x], inplace=True)
+    return df
+
+def _decode_colnames2(df,hash2name):
     "convert hashed column name back to original"
     df.rename(columns=lambda x: hash2name[x], inplace=True)
     return df
@@ -83,7 +101,6 @@ def _decode_colnames(df,hash2name):
 def sqldf(q, env, inmemory=True):
     """
     query pandas data frames using sql syntax
-
     Parameters
     ----------
     q: string
@@ -94,12 +111,10 @@ def sqldf(q, env, inmemory=True):
     dbtype: bool
         memory/disk; default is in memory; if not memory then it will be 
         temporarily persisted to disk
-
     Returns
     -------
     result: DataFrame
         returns a DataFrame with your query's result
-
     Examples
     --------
     >>> import pandas as pd
@@ -137,7 +152,9 @@ def sqldf(q, env, inmemory=True):
         #Rename column names in the query with hashes
         for n in name2hash:
             q=q.replace(n,name2hash[n])
+        print(q)
         result = read_sql(q, conn, index_col=None)
+        print(result)
         if 'index' in result:
             del result['index']
         result = _decode_colnames(result,hash2name)
@@ -148,4 +165,3 @@ def sqldf(q, env, inmemory=True):
         if not inmemory:
             os.remove(dbname)
     return result
-
