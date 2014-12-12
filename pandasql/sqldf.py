@@ -152,9 +152,9 @@ def sqldf(q, env, inmemory=True):
         #Rename column names in the query with hashes
         for n in name2hash:
             q=q.replace(n,name2hash[n])
-        print(q)
+        #print(q)
         result = read_sql(q, conn, index_col=None)
-        print(result)
+        #print(result)
         if 'index' in result:
             del result['index']
         result = _decode_colnames(result,hash2name)
